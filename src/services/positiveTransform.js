@@ -2,10 +2,10 @@ import OpenAI from 'openai';
 // Remove Firebase import
 // import { getFunctions } from "firebase/functions";
 
-const API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY; // Ensure this is the correct key
+const API_KEY = import.meta.env.VITE_OPENAI_API_KEY; // Changed to VITE_OPENAI_API_KEY
 
 if (!API_KEY) {
-  console.error("API key is missing. Please check your .env file.");
+  console.error("OpenAI API key is missing. Please check your .env file.");
 }
 
 const openai = new OpenAI({
@@ -17,9 +17,13 @@ const openai = new OpenAI({
 // const functions = getFunctions(app);
 
 export const transformToPositive = async (message) => {
+  if (!API_KEY) {
+    return "I apologize, but I'm unable to process your request at the moment due to a configuration issue. Please try again later.";
+  }
+
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-3.5-turbo', // Changed to a valid model name
       messages: [
         { role: 'system', content: 'You are a spiritual healer. Your purpose is to provide guidance that encompasses all aspects of spirituality, including insights from the universe and cosmic wisdom.' },
         { role: 'user', content: message }
