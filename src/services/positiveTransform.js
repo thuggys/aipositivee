@@ -2,37 +2,41 @@ import OpenAI from 'openai';
 // Remove Firebase import
 // import { getFunctions } from "firebase/functions";
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+});
 
-let openai;
+export const transformToPositive = async (input) => {
+  const prompt = `
+As an AI assistant specializing in positive psychology and emotional intelligence, your task is to transform the given input into a more positive and constructive perspective. Follow these guidelines:
 
-try {
-  openai = new OpenAI({
-    apiKey: OPENAI_API_KEY,
-    dangerouslyAllowBrowser: true
-  });
-} catch (error) {
-  console.error("Error initializing OpenAI:", error.message);
-}
+1. Empathize: Acknowledge the user's feelings and perspective.
+2. Reframe: Help the user see the situation from a different, more positive angle.
+3. Identify opportunities: Point out potential growth or learning experiences.
+4. Suggest actionable steps: Provide practical advice to improve the situation.
+5. Encourage: Offer words of support and motivation.
+6. Maintain authenticity: Ensure the response is genuine and not overly optimistic.
 
-export async function transformToPositive(input) {
-  if (!openai) {
-    console.error("OpenAI client is not initialized. Please check your API key configuration.");
-    return "I apologize, but I'm unable to process your request at the moment. Please try again later.";
-  }
+Input: "${input}"
+
+Positive transformation:`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       messages: [
-        { role: "system", content: "You are a mystical healer assistant. Transform the user's input into a positive, uplifting message that promotes healing and well-being." },
-        { role: "user", content: input }
+        { role: 'system', content: 'You are a helpful assistant that provides positive and constructive responses.' },
+        { role: 'user', content: prompt },
       ],
+      max_tokens: 500,
+      n: 1,
+      temperature: 0.8,
     });
 
-    return completion.choices[0].message.content;
+    return response.choices[0].message.content.trim();
   } catch (error) {
-    console.error("Error calling OpenAI API:", error);
-    return "I'm sorry, but I couldn't process your request. Let's focus on positive energy and try again.";
+    console.error('Error calling OpenAI API:', error);
+    throw error;
   }
-}
+};

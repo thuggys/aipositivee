@@ -1,60 +1,53 @@
 import React from 'react';
-import { Box, Text, Flex, Avatar, Tooltip, useColorModeValue } from '@chakra-ui/react';
+import { Box, Text, Flex, Avatar, useColorModeValue, Tooltip } from '@chakra-ui/react';
 import { format } from 'date-fns';
 
-const ChatMessage = ({ message, isUser, timestamp, fontSize }) => {
+const ChatMessage = ({ message, isUser, timestamp }) => {
   const bgColor = useColorModeValue(
-    isUser ? 'blue.100' : 'gray.100',
-    isUser ? 'blue.700' : 'gray.700'
+    isUser ? 'purple.600' : 'indigo.700',
+    isUser ? 'purple.500' : 'indigo.600'
   );
-  const textColor = useColorModeValue(
-    isUser ? 'blue.800' : 'gray.800',
-    isUser ? 'blue.100' : 'gray.100'
-  );
-  const avatarBg = useColorModeValue(
-    isUser ? 'blue.500' : 'gray.500',
-    isUser ? 'blue.200' : 'gray.200'
-  );
+  const textColor = 'white';
+  const formattedTime = format(new Date(timestamp), 'HH:mm');
 
   return (
-    <Flex justify={isUser ? 'flex-end' : 'flex-start'} mb={4}>
-      {!isUser && (
-        <Avatar
-          size="sm"
-          name="AI Assistant"
-          src="/ai-avatar.png"
-          mr={2}
-          bg={avatarBg}
-        />
-      )}
-      <Box maxWidth="70%">
-        <Tooltip label={format(new Date(timestamp), 'PPpp')} placement={isUser ? 'left' : 'right'}>
-          <Box
-            bg={bgColor}
-            color={textColor}
-            px={4}
-            py={2}
-            borderRadius="lg"
-            boxShadow="md"
-          >
-            <Text fontSize={fontSize} whiteSpace="pre-wrap" wordBreak="break-word">
-              {message}
-            </Text>
-          </Box>
+    <Flex 
+      justify={isUser ? 'flex-end' : 'flex-start'} 
+      mb={4}
+      mx={{ base: 2, md: 4 }}
+    >
+      <Flex 
+        maxWidth={{ base: "85%", md: "75%" }} 
+        alignItems="flex-end"
+        flexDirection={isUser ? 'row-reverse' : 'row'}
+      >
+        <Tooltip label={isUser ? 'You' : 'AI Assistant'} placement={isUser ? 'left' : 'right'}>
+          <Avatar
+            size="sm"
+            name={isUser ? 'User' : 'AI Assistant'}
+            src={isUser ? '/user-avatar.png' : '/ai-avatar.png'}
+            mr={isUser ? 0 : 2}
+            ml={isUser ? 2 : 0}
+          />
         </Tooltip>
-        <Text fontSize="xs" color="gray.500" mt={1} textAlign={isUser ? 'right' : 'left'}>
-          {format(new Date(timestamp), 'p')}
-        </Text>
-      </Box>
-      {isUser && (
-        <Avatar
-          size="sm"
-          name="User"
-          src="/user-avatar.png"
-          ml={2}
-          bg={avatarBg}
-        />
-      )}
+        <Box
+          bg={bgColor}
+          color={textColor}
+          px={4}
+          py={3}
+          borderRadius="lg"
+          boxShadow="md"
+          ml={isUser ? 0 : 2}
+          mr={isUser ? 2 : 0}
+        >
+          <Text fontSize="md" whiteSpace="pre-wrap" wordBreak="break-word">
+            {message}
+          </Text>
+          <Text fontSize="xs" mt={1} textAlign="right" opacity={0.7}>
+            {formattedTime}
+          </Text>
+        </Box>
+      </Flex>
     </Flex>
   );
 };

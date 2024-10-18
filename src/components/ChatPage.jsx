@@ -1,268 +1,283 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Box,
-  Flex,
-  Text,
-  useDisclosure,
-  IconButton,
-  VStack,
-  Button,
-  useColorMode,
-  useToast,
-  Fade,
-  Textarea,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useMediaQuery,
-} from '@chakra-ui/react';
-import { FaArrowLeft, FaCog, FaMagic, FaMoon, FaSun, FaLeaf, FaWind, FaTint, FaBars } from 'react-icons/fa';
-import { GiSparkles } from 'react-icons/gi';
+import React, { useState, useRef, useEffect } from 'react';
+import { Box, VStack, Button, Flex, useColorModeValue, Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, DrawerCloseButton, useDisclosure, Text, Avatar, Tooltip, IconButton, Heading, Divider, useMediaQuery } from '@chakra-ui/react';
+import { FaMagic, FaClock, FaTrash, FaBars, FaStar, FaSun, FaMoon, FaSignOutAlt } from 'react-icons/fa';
 import ChatMessage from './ChatMessage';
 import { transformToPositive } from '../services/positiveTransform';
-import { debounce } from 'lodash';
-import SettingsModal from './SettingsModal';
-import { motion, AnimatePresence } from 'framer-motion';
+import ChatInput from './ChatInput';
+import LoginModal from './LoginModal';
+import { auth } from '../firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
-const MotionBox = motion(Box);
-
-const ChatPage = ({ settings = { fontSize: '16px' }, updateSettings }) => {
-  const [messages, setMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState('Spiritual Healer Assistant');
+const ChatPage = () => {
+  const [messages, setMessages] = useState([
+    { id: 1, isUser: false, message: "Welcome to the AI Positive Chat. How may I assist you on your journey to wellness?", timestamp: new Date() },
+  ]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
-  const { isOpen: isSettingsOpen, onOpen: onSettingsOpen, onClose: onSettingsClose } = useDisclosure();
-  const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
-  const { colorMode, toggleColorMode } = useColorMode();
-  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [chatHistory, setChatHistory] = useState([
+    { id: 1, title: "First Positive Session", timestamp: new Date().toISOString() },
+  ]);
+
   const [isMobile] = useMediaQuery("(max-width: 768px)");
 
-  const healingTopics = [
-    { name: "Spiritual Cleansing", icon: <FaMoon />, explanation: "I'll guide you through spiritual cleansing techniques to purify your energy and remove negative influences." },
-    { name: "Energy Balancing", icon: <FaSun />, explanation: "I'll help you understand and balance your body's energy centers for improved well-being." },
-    { name: "Herbal Remedies", icon: <FaLeaf />, explanation: "I'll suggest natural herbal remedies to support your healing journey, based on ancient wisdom." },
-    { name: "Chakra Alignment", icon: <FaWind />, explanation: "I'll assist you in aligning and harmonizing your chakras for optimal energy flow." },
-    { name: "Crystal Healing", icon: <GiSparkles />, explanation: "I'll recommend crystals and explain their healing properties to support your specific needs." },
-    { name: "Aura Cleansing", icon: <FaTint />, explanation: "I'll guide you through techniques to cleanse and strengthen your aura for protection and vitality." },
-  ];
-
-  const debouncedSetMessages = debounce((newMessage) => {
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-  }, 300);
-
-  const getTopicSpecificResponse = async (topic, userMessage) => {
-    // This function would ideally call a backend API that handles topic-specific AI responses
-    // For now, we'll simulate it with some predefined responses
-    const responses = {
-      "Spiritual Cleansing": "To cleanse your spirit, try this meditation: Close your eyes, visualize a white light surrounding you, and imagine it washing away all negative energy.",
-      "Energy Balancing": "Let's balance your energy. Focus on your breath, inhaling positive energy and exhaling any tension or negativity.",
-      "Herbal Remedies": "Based on your concerns, I recommend trying chamomile tea for relaxation or peppermint for digestive issues. Always consult with a healthcare professional before starting any new herbal regimen.",
-      "Chakra Alignment": "Let's start with your root chakra. Visualize a red spinning wheel at the base of your spine, grounding you to the earth.",
-      "Crystal Healing": "For your situation, I suggest using amethyst for stress relief and clarity. Hold it in your hand during meditation or place it under your pillow at night.",
-      "Aura Cleansing": "To cleanse your aura, try this: Stand in sunlight or moonlight, close your eyes, and imagine a shower of light washing over you, cleansing your energy field."
-    };
-    
-    return responses[topic] || "I'm here to guide you on your healing journey. What specific area would you like to focus on?";
+  const bgColor = useColorModeValue('purple.900', 'indigo.900');
+  const sidebarBgColor = useColorModeValue('blackAlpha.200', 'blackAlpha.400');
+  const inputBgColor = useColorModeValue('purple.700', 'purple.600');
+  const colorMode = useColorModeValue('light', 'dark');
+  const toggleColorMode = () => {
+    // Implement color mode toggle functionality
   };
 
-  const handleSendMessage = async () => {
-    if (inputMessage.trim() === "") return;
+  const [user, setUser] = useState(null);
 
-    debouncedSetMessages({ role: "user", content: inputMessage });
-    setInputMessage("");
-    setLoading(true);
-    
-    try {
-      const aiResponse = await getTopicSpecificResponse(mode, inputMessage);
-      const transformedMessage = await transformToPositive(aiResponse);
-      debouncedSetMessages({ role: "ai", content: transformedMessage });
-    } catch (error) {
-      console.error('Error processing message:', error);
-      debouncedSetMessages({ role: "ai", content: "I apologize, but I'm having trouble connecting with the spiritual energies at the moment. Let's try again in a few moments." });
-      toast({
-        title: "Connection Issue",
-        description: "There was a disturbance in the energy flow. Please try again.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTopicClick = (topic) => {
-    setMode(topic.name);
-    setMessages([
-      { role: "ai", content: `Welcome to ${topic.name}. ${topic.explanation}` },
-      { role: "ai", content: "How may I assist you today on your healing journey?" }
-    ]);
-    toast({
-      title: `${topic.name} Activated`,
-      description: "The spiritual energies have shifted to focus on your new healing path.",
-      status: "info",
-      duration: 3000,
-      isClosable: true,
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
     });
-  };
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    setMessages([
-      { role: "ai", content: "Welcome to the Mystical Healing Chat. How may I assist you on your journey to wellness?" },
-    ]);
+    return () => unsubscribe();
   }, []);
 
-  const SidebarContent = () => (
-    <VStack p={4} align="stretch" spacing={4} h="full">
-      <Flex align="center">
-        <GiSparkles />
-        <Text ml={2} fontSize="xl" fontWeight="semibold">Mystical Healing</Text>
-      </Flex>
-      {healingTopics.map((topic) => (
-        <Button
-          key={topic.name}
-          leftIcon={topic.icon}
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out: ", error);
+    }
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (message) => {
+    const userMessage = { id: messages.length + 1, message, isUser: true, timestamp: new Date() };
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+    
+    setIsAiTyping(true);
+    try {
+      const aiResponse = await transformToPositive(message);
+      setTimeout(() => {
+        const aiMessage = { id: messages.length + 2, message: aiResponse, isUser: false, timestamp: new Date() };
+        setMessages(prevMessages => [...prevMessages, aiMessage]);
+        setIsAiTyping(false);
+      }, 1000 + Math.random() * 1000);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      setIsAiTyping(false);
+    }
+  };
+
+  const clearChat = () => {
+    setMessages([{ id: 1, isUser: false, message: "Welcome to a new positive session. How may I assist you today?", timestamp: new Date() }]);
+  };
+
+  const startNewChat = () => {
+    const newChatId = chatHistory.length + 1;
+    setChatHistory(prevHistory => [
+      { id: newChatId, title: `Positive Session ${newChatId}`, timestamp: new Date().toISOString() },
+      ...prevHistory,
+    ]);
+    clearChat();
+    if (isMobile) onClose();
+  };
+
+  const Sidebar = () => (
+    <VStack p={6} spacing={6} align="stretch" h="100%">
+      <Flex align="center" justify="space-between">
+        <Flex align="center">
+          <FaStar size="24px" />
+          <Heading ml={3} size="md">AI Positive Chat</Heading>
+        </Flex>
+        <IconButton
+          icon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
+          onClick={toggleColorMode}
           variant="ghost"
-          justifyContent="flex-start"
-          onClick={() => {
-            handleTopicClick(topic);
-            if (isMobile) onSidebarClose();
-          }}
-          _hover={{ bg: colorMode === 'light' ? "purple.100" : "purple.900" }}
-        >
-          {topic.name}
-        </Button>
-      ))}
-      <Box flex="1" />
-      <Button
-        leftIcon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
-        onClick={toggleColorMode}
-        variant="ghost"
-        justifyContent="flex-start"
-      >
-        {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
+          aria-label="Toggle color mode"
+        />
+      </Flex>
+      <Button leftIcon={<FaMagic />} onClick={startNewChat} colorScheme="purple" size="lg">
+        New Chat
       </Button>
+      <Divider />
+      <VStack spacing={4} align="stretch" overflowY="auto" flex={1}>
+        <Heading size="sm">Chat History</Heading>
+        {chatHistory.map((chat) => (
+          <Button
+            key={chat.id}
+            variant="ghost"
+            justifyContent="flex-start"
+            w="full"
+            _hover={{ bg: 'purple.800', bgOpacity: 0.5 }}
+          >
+            <FaClock className="w-4 h-4 mr-2" />
+            <Box textAlign="left">
+              <Text isTruncated>{chat.title}</Text>
+              <Text fontSize="xs" color="purple.300">
+                {new Date(chat.timestamp).toLocaleString()}
+              </Text>
+            </Box>
+          </Button>
+        ))}
+      </VStack>
+      <Divider />
+      {user ? (
+        <Button
+          leftIcon={<FaSignOutAlt />}
+          onClick={handleSignOut}
+          colorScheme="purple"
+          variant="outline"
+        >
+          Sign Out
+        </Button>
+      ) : (
+        <Button
+          className="button-85"
+          role="button"
+          onClick={onLoginOpen}
+          w="full"
+          h="auto"
+          p="0.6em 2em"
+          borderRadius="10px"
+          fontWeight="normal"
+          textTransform="uppercase"
+          letterSpacing="0.05em"
+          _hover={{}}
+          _active={{}}
+          _focus={{}}
+        >
+          Login
+        </Button>
+      )}
     </VStack>
   );
 
+  const { isOpen: isLoginOpen, onOpen: onLoginOpen, onClose: onLoginClose } = useDisclosure();
+
   return (
-    <Flex h="100vh" bg={colorMode === 'light' ? "gray.50" : "gray.900"}>
+    <Flex h="100vh" bg={`linear-gradient(to bottom right, ${bgColor}, ${useColorModeValue('indigo.900', 'purple.900')})`} color="white">
       {/* Sidebar for desktop */}
       {!isMobile && (
-        <AnimatePresence>
-          <MotionBox
-            initial={{ x: -100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -100, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            w="64"
-            bg={colorMode === 'light' ? "white" : "gray.800"}
-            borderRight="1px"
-            borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}
-            position="sticky"
-            top="0"
-            h="100vh"
-            overflowY="auto"
-          >
-            <SidebarContent />
-          </MotionBox>
-        </AnimatePresence>
+        <Box w="300px" bg={sidebarBgColor} backdropFilter="blur(10px)" borderRight="1px" borderColor="purple.700">
+          <Sidebar />
+        </Box>
       )}
 
-      {/* Drawer for mobile */}
-      <Drawer isOpen={isSidebarOpen && isMobile} placement="left" onClose={onSidebarClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader>Mystical Healing</DrawerHeader>
-          <DrawerBody>
-            <SidebarContent />
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-
       {/* Main Chat Area */}
-      <Flex flex={1} direction="column">
-        <Flex align="center" justify="space-between" p={4} bg={colorMode === 'light' ? "white" : "gray.800"} borderBottom="1px" borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}>
-          {isMobile ? (
+      <Flex flex={1} flexDir="column">
+        {/* Header for mobile */}
+        {isMobile && (
+          <Flex p={4} bg={sidebarBgColor} backdropFilter="blur(10px)" borderBottom="1px" borderColor="purple.700" align="center" justify="space-between">
             <IconButton
               icon={<FaBars />}
-              onClick={onSidebarOpen}
+              onClick={onOpen}
               variant="ghost"
-              aria-label="Open sidebar"
+              aria-label="Open menu"
             />
-          ) : (
+            <Heading size="md">AI Positive Chat</Heading>
             <IconButton
-              icon={<FaArrowLeft />}
-              onClick={() => window.location.href = '/'}
+              icon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
+              onClick={toggleColorMode}
               variant="ghost"
-              aria-label="Back"
+              aria-label="Toggle color mode"
             />
-          )}
-          <Text fontSize="xl" fontWeight="bold">{mode}</Text>
-          <IconButton
-            icon={<FaCog />}
-            onClick={onSettingsOpen}
-            variant="ghost"
-            aria-label="Settings"
-          />
-        </Flex>
-
-        <VStack flex={1} overflowY="auto" p={4} spacing={4} align="stretch">
-          {messages.map((msg, index) => (
-            <Fade in={true} key={index}>
-              <ChatMessage
-                message={msg.content}
-                isUser={msg.role === 'user'}
-                timestamp={new Date().toISOString()}
-                fontSize={settings.fontSize}
-              />
-            </Fade>
+          </Flex>
+        )}
+        
+        {/* Chat messages */}
+        <VStack flex={1} overflowY="auto" spacing={4} p={6} alignItems="stretch">
+          {messages.map((msg) => (
+            <ChatMessage key={msg.id} {...msg} />
           ))}
           <div ref={messagesEndRef} />
         </VStack>
 
-        <Flex p={4} bg={colorMode === 'light' ? "white" : "gray.800"} borderTop="1px" borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}>
-          <Textarea
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Ask for mystical guidance..."
-            mr={2}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            resize="none"
-            rows={1}
-            maxRows={4}
-            overflow="hidden"
-            minH="40px"
-            flex={1}
-          />
-          <Button onClick={handleSendMessage} leftIcon={<FaMagic />} isLoading={loading} colorScheme="purple">
-            Send
-          </Button>
-        </Flex>
+        {/* Input Area */}
+        <Box p={4} bg={sidebarBgColor} backdropFilter="blur(10px)" borderTop="1px" borderColor="purple.700">
+          <ChatInput onSendMessage={handleSendMessage} isAiTyping={isAiTyping} />
+        </Box>
       </Flex>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={onSettingsClose} 
-        settings={settings}
-        updateSettings={updateSettings}
-      />
+      {/* Menu Drawer (for mobile) */}
+      <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="full">
+        <DrawerOverlay>
+          <DrawerContent bg={bgColor}>
+            <DrawerCloseButton />
+            <DrawerHeader>Menu</DrawerHeader>
+            <DrawerBody>
+              <Sidebar />
+            </DrawerBody>
+          </DrawerContent>
+        </DrawerOverlay>
+      </Drawer>
+
+      {!user && <LoginModal isOpen={isLoginOpen} onClose={onLoginClose} />}
+      
+      <style jsx global>{`
+        .button-85 {
+          color: rgb(255, 255, 255);
+          background: #111;
+          cursor: pointer;
+          position: relative;
+          z-index: 0;
+          user-select: none;
+          -webkit-user-select: none;
+          touch-action: manipulation;
+        }
+
+        .button-85:before {
+          content: "";
+          background: linear-gradient(
+            45deg,
+            #ff0000,
+            #ff7300,
+            #fffb00,
+            #48ff00,
+            #00ffd5,
+            #002bff,
+            #7a00ff,
+            #ff00c8,
+            #ff0000
+          );
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          background-size: 400%;
+          z-index: -1;
+          filter: blur(5px);
+          -webkit-filter: blur(5px);
+          width: calc(100% + 4px);
+          height: calc(100% + 4px);
+          animation: glowing-button-85 20s linear infinite;
+          transition: opacity 0.3s ease-in-out;
+          border-radius: 10px;
+        }
+
+        @keyframes glowing-button-85 {
+          0% {
+            background-position: 0 0;
+          }
+          50% {
+            background-position: 400% 0;
+          }
+          100% {
+            background-position: 0 0;
+          }
+        }
+
+        .button-85:after {
+          z-index: -1;
+          content: "";
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: #222;
+          left: 0;
+          top: 0;
+          border-radius: 10px;
+        }
+      `}</style>
     </Flex>
   );
 };
