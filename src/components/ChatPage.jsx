@@ -5,92 +5,109 @@ import {
   Text,
   useDisclosure,
   IconButton,
-  Icon,
-  Drawer, // Import Drawer
-  DrawerOverlay, // Import DrawerOverlay
-  DrawerContent, // Import DrawerContent
-  DrawerCloseButton, // Import DrawerCloseButton
-  DrawerHeader, // Import DrawerHeader
-  DrawerBody, // Import DrawerBody
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
-  ModalFooter,
-  Button,
   VStack,
+  Button,
+  useColorMode,
+  useToast,
+  Fade,
+  Textarea,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  useMediaQuery,
 } from '@chakra-ui/react';
-import { FaArrowLeft, FaCog, FaMagic } from 'react-icons/fa';
+import { FaArrowLeft, FaCog, FaMagic, FaMoon, FaSun, FaLeaf, FaWind, FaTint, FaBars } from 'react-icons/fa';
+import { GiSparkles } from 'react-icons/gi';
 import ChatMessage from './ChatMessage';
-import ChatInput from './ChatInput';
 import { transformToPositive } from '../services/positiveTransform';
 import { debounce } from 'lodash';
-import { v4 as uuidv4 } from 'uuid';
-import Sidebox from './sidebox';
 import SettingsModal from './SettingsModal';
-import TypingIndicator from './TypingIndicator';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { keyframes } from '@emotion/react'; // Ensure this is the correct import
-import { useColorMode, Button as ChakraButton } from '@chakra-ui/react';
-// Remove the Firebase import
-// import { firebaseApp } from '../firebase'; // Adjust based on actual named exports
-// import { getFirestore } from "firebase/firestore";
+const MotionBox = motion(Box);
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-function ChatPage({ onBack, settings = { fontSize: '16px' }, updateSettings }) {
+const ChatPage = ({ settings = { fontSize: '16px' }, updateSettings }) => {
   const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState('Spiritual Healer Assistant'); // Default mode set to Spiritual Healer Assistant
+  const [mode, setMode] = useState('Spiritual Healer Assistant');
   const messagesEndRef = useRef(null);
-  const { isOpen, onOpen, onClose } = useDisclosure(); // For Settings Modal
-  const { isOpen: isSidebarOpen, onOpen: onOpenSidebar, onClose: onCloseSidebar } = useDisclosure(); // For Sidebar Drawer
-  const { isOpen: isWandModalOpen, onOpen: onOpenWandModal, onClose: onCloseWandModal } = useDisclosure(); // For Wand Modal
+  const { isOpen: isSettingsOpen, onOpen: onSettingsOpen, onClose: onSettingsClose } = useDisclosure();
+  const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
   const { colorMode, toggleColorMode } = useColorMode();
+  const toast = useToast();
+  const [isMobile] = useMediaQuery("(max-width: 768px)");
+
+  const healingTopics = [
+    { name: "Spiritual Cleansing", icon: <FaMoon />, explanation: "I'll guide you through spiritual cleansing techniques to purify your energy and remove negative influences." },
+    { name: "Energy Balancing", icon: <FaSun />, explanation: "I'll help you understand and balance your body's energy centers for improved well-being." },
+    { name: "Herbal Remedies", icon: <FaLeaf />, explanation: "I'll suggest natural herbal remedies to support your healing journey, based on ancient wisdom." },
+    { name: "Chakra Alignment", icon: <FaWind />, explanation: "I'll assist you in aligning and harmonizing your chakras for optimal energy flow." },
+    { name: "Crystal Healing", icon: <GiSparkles />, explanation: "I'll recommend crystals and explain their healing properties to support your specific needs." },
+    { name: "Aura Cleansing", icon: <FaTint />, explanation: "I'll guide you through techniques to cleanse and strengthen your aura for protection and vitality." },
+  ];
 
   const debouncedSetMessages = debounce((newMessage) => {
     setMessages((prevMessages) => [...prevMessages, newMessage]);
   }, 300);
 
-  const handleSendMessage = async (message) => {
-    debouncedSetMessages({ id: uuidv4(), text: message, isUser: true, timestamp: new Date().toISOString() });
+  const getTopicSpecificResponse = async (topic, userMessage) => {
+    // This function would ideally call a backend API that handles topic-specific AI responses
+    // For now, we'll simulate it with some predefined responses
+    const responses = {
+      "Spiritual Cleansing": "To cleanse your spirit, try this meditation: Close your eyes, visualize a white light surrounding you, and imagine it washing away all negative energy.",
+      "Energy Balancing": "Let's balance your energy. Focus on your breath, inhaling positive energy and exhaling any tension or negativity.",
+      "Herbal Remedies": "Based on your concerns, I recommend trying chamomile tea for relaxation or peppermint for digestive issues. Always consult with a healthcare professional before starting any new herbal regimen.",
+      "Chakra Alignment": "Let's start with your root chakra. Visualize a red spinning wheel at the base of your spine, grounding you to the earth.",
+      "Crystal Healing": "For your situation, I suggest using amethyst for stress relief and clarity. Hold it in your hand during meditation or place it under your pillow at night.",
+      "Aura Cleansing": "To cleanse your aura, try this: Stand in sunlight or moonlight, close your eyes, and imagine a shower of light washing over you, cleansing your energy field."
+    };
+    
+    return responses[topic] || "I'm here to guide you on your healing journey. What specific area would you like to focus on?";
+  };
+
+  const handleSendMessage = async () => {
+    if (inputMessage.trim() === "") return;
+
+    debouncedSetMessages({ role: "user", content: inputMessage });
+    setInputMessage("");
     setLoading(true);
     
     try {
-      const transformedMessage = await transformToPositive(message);
-      debouncedSetMessages({ id: uuidv4(), text: transformedMessage, isUser: false, timestamp: new Date().toISOString() });
+      const aiResponse = await getTopicSpecificResponse(mode, inputMessage);
+      const transformedMessage = await transformToPositive(aiResponse);
+      debouncedSetMessages({ role: "ai", content: transformedMessage });
     } catch (error) {
-      console.error('Error transforming message:', error);
-      debouncedSetMessages({ id: uuidv4(), text: "I'm here to help you find peace and clarity. Let's work through this together.", isUser: false, timestamp: new Date().toISOString() });
+      console.error('Error processing message:', error);
+      debouncedSetMessages({ role: "ai", content: "I apologize, but I'm having trouble connecting with the spiritual energies at the moment. Let's try again in a few moments." });
+      toast({
+        title: "Connection Issue",
+        description: "There was a disturbance in the energy flow. Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFortuneTelling = async () => {
-    setMode('Fortune Telling');
-    const mysticalPrompt = `
-      You are a wise and mystical oracle. Provide a fortune that is insightful, poetic, and filled with mystery. 
-      Use elements of nature, time, and destiny to weave a tale that captivates and inspires.
-    `;
-
-    debouncedSetMessages({ id: uuidv4(), text: "Consulting the oracle...", isUser: false, timestamp: new Date().toISOString() });
-    setLoading(true);
-
-    try {
-      const fortune = await transformToPositive(mysticalPrompt);
-      debouncedSetMessages({ id: uuidv4(), text: fortune, isUser: false, timestamp: new Date().toISOString() });
-    } catch (error) {
-      console.error('Error generating fortune:', error);
-      debouncedSetMessages({ id: uuidv4(), text: "The oracle is silent. Please try again later.", isUser: false, timestamp: new Date().toISOString() });
-    } finally {
-      setLoading(false);
-    }
+  const handleTopicClick = (topic) => {
+    setMode(topic.name);
+    setMessages([
+      { role: "ai", content: `Welcome to ${topic.name}. ${topic.explanation}` },
+      { role: "ai", content: "How may I assist you today on your healing journey?" }
+    ]);
+    toast({
+      title: `${topic.name} Activated`,
+      description: "The spiritual energies have shifted to focus on your new healing path.",
+      status: "info",
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   useEffect(() => {
@@ -99,131 +116,155 @@ function ChatPage({ onBack, settings = { fontSize: '16px' }, updateSettings }) {
     }
   }, [messages]);
 
+  useEffect(() => {
+    setMessages([
+      { role: "ai", content: "Welcome to the Mystical Healing Chat. How may I assist you on your journey to wellness?" },
+    ]);
+  }, []);
+
+  const SidebarContent = () => (
+    <VStack p={4} align="stretch" spacing={4} h="full">
+      <Flex align="center">
+        <GiSparkles />
+        <Text ml={2} fontSize="xl" fontWeight="semibold">Mystical Healing</Text>
+      </Flex>
+      {healingTopics.map((topic) => (
+        <Button
+          key={topic.name}
+          leftIcon={topic.icon}
+          variant="ghost"
+          justifyContent="flex-start"
+          onClick={() => {
+            handleTopicClick(topic);
+            if (isMobile) onSidebarClose();
+          }}
+          _hover={{ bg: colorMode === 'light' ? "purple.100" : "purple.900" }}
+        >
+          {topic.name}
+        </Button>
+      ))}
+      <Box flex="1" />
+      <Button
+        leftIcon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
+        onClick={toggleColorMode}
+        variant="ghost"
+        justifyContent="flex-start"
+      >
+        {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
+      </Button>
+    </VStack>
+  );
+
   return (
-    <Box
-      position="relative"
-      minHeight="100vh"
-      display="flex"
-      flexDirection="column"
-      bgGradient={colorMode === 'light' ? 'linear(to-br, gray.100, gray.200)' : 'linear(to-br, gray.800, gray.900)'}
-      animation={`${fadeIn} 0.5s ease-out`}
-    >
-      <ChakraButton onClick={toggleColorMode} position="absolute" top={4} right={4}>
-        Switch to {colorMode === 'light' ? 'Dark' : 'Light'} Mode
-      </ChakraButton>
-      <Flex flex="1" overflow="hidden">
-        {/* Persistent Sidebar on Desktop */}
-        <Box display={{ base: 'none', md: 'block' }}>
-          <Sidebox
-            onViewHistory={() => console.log('View history clicked')}
-            onShowInfo={() => console.log('Show info clicked')}
-            onOpenSettings={onOpen}
-          />
-        </Box>
+    <Flex h="100vh" bg={colorMode === 'light' ? "gray.50" : "gray.900"}>
+      {/* Sidebar for desktop */}
+      {!isMobile && (
+        <AnimatePresence>
+          <MotionBox
+            initial={{ x: -100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -100, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            w="64"
+            bg={colorMode === 'light' ? "white" : "gray.800"}
+            borderRight="1px"
+            borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}
+            position="sticky"
+            top="0"
+            h="100vh"
+            overflowY="auto"
+          >
+            <SidebarContent />
+          </MotionBox>
+        </AnimatePresence>
+      )}
 
-        {/* Drawer for Mobile Sidebar */}
-        <Drawer isOpen={isSidebarOpen} placement="left" onClose={onCloseSidebar}>
-          <DrawerOverlay />
-          <DrawerContent bg="rgba(26, 32, 44, 0.8)" maxW="80%" borderRight="1px solid" borderColor="gray.700">
-            <DrawerCloseButton color="white" />
-            <DrawerHeader color="white">Menu</DrawerHeader>
-            <DrawerBody p={0}>
-              <Sidebox
-                onViewHistory={() => console.log('View history clicked')}
-                onShowInfo={() => console.log('Show info clicked')}
-                onOpenSettings={onOpen}
-              />
-            </DrawerBody>
-          </DrawerContent>
-        </Drawer>
+      {/* Drawer for mobile */}
+      <Drawer isOpen={isSidebarOpen && isMobile} placement="left" onClose={onSidebarClose}>
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>Mystical Healing</DrawerHeader>
+          <DrawerBody>
+            <SidebarContent />
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
-        {/* Chat Area */}
-        <Box flex="1" display="flex" flexDirection="column" bg="rgba(26, 32, 44, 0.4)" backdropFilter="blur(5px)">
-          <Flex align="center" justify="space-between" p={4} bg="rgba(45, 55, 72, 0.8)" borderBottom="1px solid" borderColor="gray.700">
+      {/* Main Chat Area */}
+      <Flex flex={1} direction="column">
+        <Flex align="center" justify="space-between" p={4} bg={colorMode === 'light' ? "white" : "gray.800"} borderBottom="1px" borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}>
+          {isMobile ? (
+            <IconButton
+              icon={<FaBars />}
+              onClick={onSidebarOpen}
+              variant="ghost"
+              aria-label="Open sidebar"
+            />
+          ) : (
             <IconButton
               icon={<FaArrowLeft />}
               onClick={() => window.location.href = '/'}
-              colorScheme="purple"
               variant="ghost"
               aria-label="Back"
             />
-            <Text color="purple.300" fontSize="2xl" fontWeight="bold" textShadow="0 0 10px rgba(128, 0, 255, 0.7)">
-              {mode}
-            </Text>
-            <IconButton
-              icon={<FaCog />}
-              onClick={onOpen}
-              colorScheme="purple"
-              variant="ghost"
-              aria-label="Settings"
-            />
-          </Flex>
-          <Box flex="1" overflowY="auto" px={8} py={6} className="custom-scrollbar">
-            {messages.length === 0 && (
-              <Text color="white" textAlign="center" mt={8}>
-                Start a conversation by sending a message!
-              </Text>
-            )}
-            {messages.map((msg) => (
+          )}
+          <Text fontSize="xl" fontWeight="bold">{mode}</Text>
+          <IconButton
+            icon={<FaCog />}
+            onClick={onSettingsOpen}
+            variant="ghost"
+            aria-label="Settings"
+          />
+        </Flex>
+
+        <VStack flex={1} overflowY="auto" p={4} spacing={4} align="stretch">
+          {messages.map((msg, index) => (
+            <Fade in={true} key={index}>
               <ChatMessage
-                key={msg.id}
-                message={msg.text}
-                isUser={msg.isUser}
-                timestamp={msg.timestamp}
+                message={msg.content}
+                isUser={msg.role === 'user'}
+                timestamp={new Date().toISOString()}
                 fontSize={settings.fontSize}
               />
-            ))}
-            {loading && (
-              <Flex justify="center" my={4}>
-                <TypingIndicator /> {/* Show TypingIndicator when loading */}
-              </Flex>
-            )}
-            <div ref={messagesEndRef} />
-          </Box>
-          <Box p={6} bg="rgba(45, 55, 72, 0.6)">
-            <ChatInput
-              onSendMessage={handleSendMessage}
-              borderRadius="full"
-              fontSize={settings.fontSize}
-            />
-            <IconButton
-              mt={4}
-              icon={<FaMagic />}
-              onClick={onOpenWandModal}
-              colorScheme="teal"
-              variant="solid"
-              aria-label="Magic Options"
-            >
-              Magic Options
-            </IconButton>
-          </Box>
-        </Box>
+            </Fade>
+          ))}
+          <div ref={messagesEndRef} />
+        </VStack>
+
+        <Flex p={4} bg={colorMode === 'light' ? "white" : "gray.800"} borderTop="1px" borderColor={colorMode === 'light' ? "gray.200" : "gray.700"}>
+          <Textarea
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Ask for mystical guidance..."
+            mr={2}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            resize="none"
+            rows={1}
+            maxRows={4}
+            overflow="hidden"
+            minH="40px"
+            flex={1}
+          />
+          <Button onClick={handleSendMessage} leftIcon={<FaMagic />} isLoading={loading} colorScheme="purple">
+            Send
+          </Button>
+        </Flex>
       </Flex>
+
       <SettingsModal 
-        isOpen={isOpen} 
-        onClose={onClose} 
+        isOpen={isSettingsOpen} 
+        onClose={onSettingsClose} 
         settings={settings}
         updateSettings={updateSettings}
       />
-      <Modal isOpen={isWandModalOpen} onClose={onCloseWandModal}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Magic Options</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              <Button onClick={handleFortuneTelling} colorScheme="purple" size="lg" fontSize="lg" fontWeight="bold">Fortune Telling</Button>
-              <Button onClick={() => setMode('Tarot Card Reading')} colorScheme="purple" size="lg" fontSize="lg" fontWeight="bold">Tarot Card Reading</Button>
-              {/* Add more options as needed */}
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" onClick={onCloseWandModal}>Close</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
+    </Flex>
   );
-}
+};
 
 export default ChatPage;
